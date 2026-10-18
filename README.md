@@ -2,6 +2,9 @@
 ### Lovely Professional University (LPU) — CSE494: INTELLIGENT NOSQL DATABASES
 **Academic Task 2 (Project) • Maximum Marks: 30**
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/raushan950/medipulse-ehr)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/raushan950/medipulse-ehr&env=MONGODB_URI,DATABASE_NAME,FLASK_SECRET_KEY&project-name=medipulse-ehr)
+
 ---
 
 ## 🌟 Overview
