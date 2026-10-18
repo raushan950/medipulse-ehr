@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediPulse Clinic</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <!-- Chart.js for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <div class="brand-wrapper">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>MediPulse EHR</h1>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <div class="status-pill" id="dbStatus">
+        <span class="status-dot"></span>
+        <span id="dbStatusText">MongoDB Connected</span>
+      </div>
+      <span class="admin-name">Signed in: {{ admin_username }}</span>
+      <button class="btn btn-outline btn-sm" id="btnLogout" title="Sign out of admin account">Sign out</button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="container">
+    
+    <!-- HERO BANNER -->
+    <section class="hero-banner">
+      <div class="hero-content">
+        <h2>Clinical workspace</h2>
+        <p>Find a patient, review their chart, document today’s care, and plan the next visit.</p>
+      </div>
+      <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="openAdmissionModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+          Start encounter
+        </button>
+        <button class="btn btn-outline" onclick="openRegisterModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          Register patient
+        </button>
+      </div>
+    </section>
+
+    <!-- KPI CARDS (Dynamically populated from Aggregation Pipeline 4 $facet) -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Patients in chart</span>
+          <div class="kpi-icon emerald">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpiRevenue">0</div>
+        <div class="kpi-footer" id="kpiInsurance">Registered patient records</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Active encounters</span>
+          <div class="kpi-icon blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpiAdmissions">0</div>
+        <div class="kpi-footer" id="kpiStatus">Patients currently receiving care</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Follow-up visits</span>
+          <div class="kpi-icon rose">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpiAlerts">0</div>
+        <div class="kpi-footer">Scheduled appointments ahead</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Active care team</span>
+          <div class="kpi-icon cyan">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpiDoctors">0</div>
+        <div class="kpi-footer">Clinicians available for visits</div>
+      </div>
+    </section>
+
+    <!-- TAB NAVIGATION -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('patients')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        Clinical workspace
+      </button>
+      <button class="tab-btn" onclick="switchTab('analytics')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reports
+      </button>
+      <button class="tab-btn" onclick="switchTab('operations')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Admissions
+      </button>
+      <details class="nav-tools">
+        <summary>Database lab</summary>
+        <div class="nav-tools-menu">
+          <button class="tab-btn" onclick="switchTab('queries')">Query console</button>
+          <button class="tab-btn" onclick="switchTab('sandbox')">Schema checks</button>
+        </div>
+      </details>
+    </nav>
+
+    <!-- TAB 1: ACTIVE HOSPITAL WARDS & CLINICAL OPERATIONS -->
+    <div id="tab-operations" class="tab-content">
+      <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-title-bar">
+          <div>
+            <h3 id="admissionListTitle">Active encounters</h3>
+            <div id="admissionListDescription" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Patients currently receiving care. Discharged visits remain in the past encounter archive.</div>
+          </div>
+          <div class="admission-controls">
+            <div class="admission-switch" role="group" aria-label="Encounter status">
+              <button type="button" class="active" id="showActiveEncounters" onclick="setAdmissionView('active')">Active</button>
+              <button type="button" id="showPastEncounters" onclick="setAdmissionView('past')">Past visits</button>
+            </div>
+            <button class="btn btn-primary btn-sm" id="startEncounterButton" onclick="openAdmissionModal()">Start encounter</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="activeAdmissionsTable">
+            <thead>
+              <tr>
+                <th>Encounter ID</th>
+                <th>Patient Details</th>
+                <th>Ward / Dept</th>
+                <th>Attending Doctor</th>
+                <th id="admissionVitalsHeader">Latest vitals</th>
+                <th id="admissionDiagnosisHeader">Diagnosis</th>
+                <th id="admissionActionsHeader">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="activeAdmissionsBody">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: CLINICAL ANALYTICS -->
+    <div id="tab-analytics" class="tab-content">
+      <div class="content-grid-2">
+        <!-- Pipeline 1: Department Revenue Chart -->
+        <div class="card">
+          <div class="card-title-bar">
+            <h3>Departmental Financial Breakdown</h3>
+            <span class="badge-tag">Pipeline 1: $group & $sort</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="deptRevenueChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Pipeline 2: Doctor Workload Chart -->
+        <div class="card">
+          <div class="card-title-bar">
+            <h3>Doctor Revenue Contribution</h3>
+            <span class="badge-tag">Pipeline 2: $lookup Join</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="doctorRevenueChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-grid-2">
+        <!-- Pipeline 3: Medication Distribution -->
+        <div class="card">
+          <div class="card-title-bar">
+            <h3>Top Prescribed Medications</h3>
+            <span class="badge-tag">Pipeline 3: $unwind</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="medicationChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Pipeline 5: Age Stratification Table -->
+        <div class="card">
+          <div class="card-title-bar">
+            <h3>Age-Stratified Chronic Risk</h3>
+            <span class="badge-tag">Pipeline 5: $bucket</span>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="ageStratTable">
+              <thead>
+                <tr>
+                  <th>Age Bracket</th>
+                  <th>Patients</th>
+                  <th>Avg Age</th>
+                  <th>Total Chronic</th>
+                  <th>Avg Risk/Pt</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: PATIENT EHR EXPLORER -->
+    <div id="tab-patients" class="tab-content active">
+      <div class="clinical-workspace">
+        <section class="patient-finder">
+          <div class="section-heading">
+            <div><h3>Find a patient</h3><p>Search by name, patient ID, or condition</p></div>
+            <button class="btn btn-outline btn-sm" onclick="openRegisterModal()">Register patient</button>
+          </div>
+          <div class="search-filter-bar">
+            <input type="search" class="search-input" id="patientSearchInput" placeholder="Name, ID, diabetes, asthma…" oninput="handlePatientSearch(event)">
+            <select class="select-filter" id="bloodGroupFilter" onchange="filterPatients()">
+              <option value="">All blood groups</option>
+              <option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option>
+              <option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option>
+            </select>
+          </div>
+          <div class="patient-grid" id="patientsContainer"><!-- Populated dynamically --></div>
+        </section>
+        <aside class="appointment-panel">
+          <div class="section-heading">
+            <div><h3>Upcoming visits</h3><p id="appointmentQueueMeta">Scheduled follow-ups</p></div>
+            <button class="icon-button" title="Schedule follow-up" aria-label="Schedule follow-up" onclick="openAppointmentModal()">+</button>
+          </div>
+          <div id="appointmentQueue" class="appointment-queue"><p class="empty-state">Loading appointments…</p></div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- TAB 3: LIVE QUERY & AGGREGATION CONSOLE -->
+    <div id="tab-queries" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title-bar">
+          <h3>Predefined Clinical & Administrative Queries</h3>
+          <div>
+            <select class="select-filter" id="querySelector" onchange="handleQuerySelect(this.value)">
+              <option value="agg1">1. Department Revenue & Stay Breakdown ($match + $group + $sort)</option>
+              <option value="agg2">2. Doctor Workload & Cross-Collection Revenue ($lookup Join)</option>
+              <option value="agg3">3. Medication Prescription Frequencies ($unwind + $group)</option>
+              <option value="agg4">4. Executive Multi-Faceted Hospital Overview ($facet)</option>
+              <option value="agg5">5. Demographic Risk & Age Buckets ($bucket + $addFields)</option>
+              <option value="crud_blood">6. Find All Patients with Blood Group B+ (Equality Filter)</option>
+              <option value="crud_text">7. Full-Text Search: 'Diabetes' ($text & $search)</option>
+              <option value="crud_elem">8. Critical Encounters with Elevated Heart Rate ($elemMatch)</option>
+            </select>
+            <button class="btn btn-primary" onclick="executeSelectedQuery()" style="margin-left: 0.8rem;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Execute Query
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="query-box">
+        <div class="code-editor-card">
+          <div style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 0.8rem; text-transform: uppercase;">PyMongo / MongoDB Code</div>
+          <pre id="queryCodeDisplay">// Select a query to inspect code</pre>
+        </div>
+        <div class="output-window">
+          <div style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 0.8rem; text-transform: uppercase;">Live Execution Output (JSON BSON Response)</div>
+          <pre id="queryOutputDisplay">// Click Execute Query to run against MongoDB</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: SCHEMA VALIDATION SANDBOX -->
+    <div id="tab-sandbox" class="tab-content">
+      <div class="sandbox-card">
+        <div class="card-title-bar">
+          <h3>MongoDB Engine-Level $jsonSchema Validation Sandbox</h3>
+          <span class="badge-tag">validationAction: "error" • validationLevel: "strict"</span>
+        </div>
+        <p style="color: var(--text-muted); margin-bottom: 1.2rem; font-size: 0.9rem;">
+          MongoDB tests every write operation against the collection's <code>$jsonSchema</code>. Test valid and invalid payloads to see how MongoDB protects healthcare data integrity by enforcing enum boundaries, mandatory keys, and regex patterns.
+        </p>
+
+        <div class="sandbox-presets">
+          <button class="btn btn-outline btn-sm" onclick="loadSandboxPreset('valid')">✓ Valid Patient Payload</button>
+          <button class="btn btn-outline btn-sm" onclick="loadSandboxPreset('invalid_blood')">✗ Invalid Blood Group ('Z+')</button>
+          <button class="btn btn-outline btn-sm" onclick="loadSandboxPreset('invalid_phone')">✗ Invalid Phone Number Format</button>
+          <button class="btn btn-outline btn-sm" onclick="loadSandboxPreset('invalid_doctor_fee')">✗ Invalid Doctor Fee (&lt; 100)</button>
+        </div>
+
+        <textarea class="json-textarea" id="sandboxPayload" spellcheck="false"></textarea>
+
+        <div style="display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="testSandboxValidation()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Test Validation in MongoDB Engine
+          </button>
+          <button class="btn btn-outline" onclick="autoFixSandboxPayload()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            Auto-Fix & Re-Test
+          </button>
+        </div>
+
+        <div id="sandboxAlert" class="validation-alert"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: PATIENT EHR VIEWER -->
+  <div class="modal-overlay" id="ehrModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeEhrModal()">&times;</button>
+      <div id="ehrModalBody">
+        <!-- Loaded dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTER PATIENT -->
+  <div class="modal-overlay" id="registerModal">
+    <div class="modal-content" style="max-width: 600px;">
+      <button class="modal-close" onclick="closeRegisterModal()">&times;</button>
+      <h3 style="margin-bottom: 1.2rem;">Register New Patient</h3>
+      <form id="newPatientForm" onsubmit="handlePatientSubmit(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Patient ID</label>
+            <input type="text" class="form-input" id="regId" placeholder="PAT-2001" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-input" id="regName" placeholder="Rohan Mehra" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Date of Birth</label>
+            <input type="date" class="form-input" id="regDob" value="1995-06-15" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Gender</label>
+            <select class="form-input" id="regGender" required>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Blood Group ($jsonSchema Enum)</label>
+            <select class="form-input" id="regBloodGroup" required>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number (Regex Checked)</label>
+            <input type="text" class="form-input" id="regPhone" placeholder="+91-9876543210" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" class="form-input" id="regEmail" placeholder="rohan.m@example.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Chronic Conditions (comma-separated)</label>
+          <input type="text" class="form-input" id="regConditions" placeholder="Hypertension, Asthma">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+          Submit to MongoDB with $jsonSchema Validation
+        </button>
+        <div id="registerModalAlert" class="validation-alert" style="margin-top: 1rem;"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="editPatientModal">
+    <div class="modal-content" style="max-width: 600px;">
+      <button class="modal-close" onclick="closePatientEditModal()">&times;</button>
+      <h3 style="margin-bottom: 1.2rem;">Edit Patient Record</h3>
+      <form id="editPatientForm" onsubmit="handlePatientUpdate(event)">
+        <input type="hidden" id="editPatientId">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="editPatientName">Full Name</label>
+            <input class="form-input" id="editPatientName" minlength="2" maxlength="100" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editPatientDob">Date of Birth</label>
+            <input type="date" class="form-input" id="editPatientDob" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="editPatientGender">Gender</label>
+            <select class="form-input" id="editPatientGender" required>
+              <option>Male</option><option>Female</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editPatientBloodGroup">Blood Group</label>
+            <select class="form-input" id="editPatientBloodGroup" required>
+              <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+              <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="editPatientPhone">Phone</label>
+            <input class="form-input" id="editPatientPhone" pattern="[+]?[0-9 ()-]{7,20}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editPatientEmail">Email</label>
+            <input type="email" class="form-input" id="editPatientEmail" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editPatientConditions">Chronic Conditions (comma-separated)</label>
+          <input class="form-input" id="editPatientConditions">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Save Patient Changes</button>
+        <div id="editPatientAlert" class="validation-alert" style="margin-top: 1rem;"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="admissionModal">
+    <div class="modal-content" style="max-width: 620px;">
+      <button class="modal-close" onclick="closeAdmissionModal()">&times;</button>
+      <h3 style="margin-bottom: 1.2rem;">Create Clinical Admission</h3>
+      <form id="admissionForm" onsubmit="handleAdmissionSubmit(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="admissionEncounterId">Encounter ID</label>
+            <input class="form-input" id="admissionEncounterId" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admissionType">Encounter Type</label>
+            <select class="form-input" id="admissionType" required>
+              <option>Inpatient</option><option>Outpatient</option><option>Emergency</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admissionPatient">Patient</label>
+          <select class="form-input" id="admissionPatient" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admissionDoctor">Attending Doctor</label>
+          <select class="form-input" id="admissionDoctor" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admissionDiagnosis">Primary Diagnosis</label>
+          <input class="form-input" id="admissionDiagnosis" minlength="2" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Create Admission</button>
+        <div id="admissionAlert" class="validation-alert" style="margin-top: 1rem;"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="dischargeModal">
+    <div class="modal-content" style="max-width: 520px;">
+      <button class="modal-close" type="button" onclick="closeDischargeModal()">&times;</button>
+      <h3 style="margin-bottom: 0.4rem;">Discharge patient</h3>
+      <p class="discharge-encounter" id="dischargeEncounterLabel"></p>
+      <form id="dischargeForm" onsubmit="handleDischargeSubmit(event)">
+        <input type="hidden" id="dischargeEncounterId">
+        <div class="discharge-summary">
+          <div><span>Current bill</span><strong id="dischargeCurrentBill">₹0.00</strong></div>
+          <label class="form-group">
+            <span class="form-label">Additional pharmacy charges (₹)</span>
+            <input class="form-input" id="dischargePharmacyCost" type="number" min="0" step="0.01" value="0" required>
+          </label>
+          <div class="discharge-total"><span>Final bill</span><strong id="dischargeFinalBill">₹0.00</strong></div>
+        </div>
+        <button class="btn btn-primary" id="dischargeSubmit" type="submit" style="width: 100%;">Confirm discharge</button>
+        <div id="dischargeAlert" class="validation-alert" style="margin-top: 1rem;"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="visitModal">
+    <div class="modal-content" style="max-width: 560px;">
+      <button class="modal-close" type="button" onclick="closeVisitModal()">&times;</button>
+      <h3>Document this visit</h3>
+      <p class="discharge-encounter" id="visitEncounterLabel"></p>
+      <form id="visitActionForm" onsubmit="handleVisitAction(event)">
+        <input type="hidden" id="visitEncounterId">
+        <label class="form-group">
+          <span class="form-label">What are you recording?</span>
+          <select class="form-input" id="visitActionType" onchange="switchVisitAction()">
+            <option value="note">Visit note</option>
+            <option value="vitals">Vitals</option>
+            <option value="prescription">Prescription</option>
+          </select>
+        </label>
+        <div id="visitNoteFields" class="visit-fields">
+          <label class="form-group"><span class="form-label">Clinical note</span><textarea class="form-input" id="visitNote" rows="5" placeholder="Symptoms, assessment, plan…"></textarea></label>
+        </div>
+        <div id="visitVitalsFields" class="visit-fields" hidden>
+          <div class="form-row">
+            <label class="form-group"><span class="form-label">Heart rate (bpm)</span><input class="form-input" id="visitHeartRate" type="number" min="30" max="240"></label>
+            <label class="form-group"><span class="form-label">SpO₂ (%)</span><input class="form-input" id="visitSpo2" type="number" min="50" max="100"></label>
+          </div>
+          <label class="form-group"><span class="form-label">Temperature (°F)</span><input class="form-input" id="visitTemperature" type="number" min="90" max="110" step="0.1"></label>
+        </div>
+        <div id="visitPrescriptionFields" class="visit-fields" hidden>
+          <label class="form-group"><span class="form-label">Medication</span><input class="form-input" id="visitMedication"></label>
+          <div class="form-row">
+            <label class="form-group"><span class="form-label">Dosage</span><input class="form-input" id="visitDosage" placeholder="e.g. 500 mg"></label>
+            <label class="form-group"><span class="form-label">Frequency</span><input class="form-input" id="visitFrequency" placeholder="e.g. twice daily"></label>
+          </div>
+          <label class="form-group"><span class="form-label">Duration (days)</span><input class="form-input" id="visitDuration" type="number" min="1" max="365"></label>
+        </div>
+        <button class="btn btn-primary" id="visitActionSubmit" type="submit" style="width: 100%;">Save to patient chart</button>
+        <div id="visitActionAlert" class="validation-alert" style="margin-top: 1rem;"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="appointmentModal">
+    <div class="modal-content" style="max-width: 540px;">
+      <button class="modal-close" type="button" onclick="closeAppointmentModal()">&times;</button>
+      <h3>Schedule follow-up</h3>
+      <p class="discharge-encounter" id="appointmentPatientLabel"></p>
+      <form id="appointmentForm" onsubmit="handleAppointmentSubmit(event)">
+        <input type="hidden" id="appointmentPatientId">
+        <label class="form-group" id="appointmentPatientSelectRow" hidden><span class="form-label">Patient</span><select class="form-input" id="appointmentPatientSelect"></select></label>
+        <label class="form-group"><span class="form-label">Clinician</span><select class="form-input" id="appointmentDoctor" required></select></label>
+        <label class="form-group"><span class="form-label">Date and time</span><input class="form-input" id="appointmentTime" type="datetime-local" required></label>
+        <label class="form-group"><span class="form-label">Reason for follow-up</span><input class="form-input" id="appointmentReason" minlength="3" maxlength="200" required></label>
+        <button class="btn btn-primary" id="appointmentSubmit" type="submit" style="width: 100%;">Save appointment</button>
+        <div id="appointmentAlert" class="validation-alert" style="margin-top: 1rem;"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="deletePatientModal">
+    <div class="modal-content" style="max-width: 440px;">
+      <button class="modal-close" type="button" onclick="closeDeletePatientModal()">&times;</button>
+      <h3>Remove patient record?</h3>
+      <p class="discharge-encounter" id="deletePatientMessage"></p>
+      <div class="chart-actions">
+        <button class="btn btn-outline" type="button" onclick="closeDeletePatientModal()">Keep record</button>
+        <button class="btn btn-danger" type="button" onclick="deletePatient()">Remove record</button>
+      </div>
+      <div id="deletePatientAlert" class="validation-alert" style="margin-top: 1rem;"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

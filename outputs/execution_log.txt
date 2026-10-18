@@ -1,0 +1,203 @@
+================================================================================
+  MEDIPULSE HOSPITAL EHR SYSTEM - EXECUTION RUN & VERIFICATION
+  Timestamp: 2026-10-16 11:36:11
+================================================================================
+
+[STEP 1] Re-seeding Database...
+
+[STEP 2] Running Schema Validation Demonstration...
+
+================================================================================
+  1. MONGODB SCHEMA VALIDATION ($JSONSCHEMA) DEMONSTRATION
+================================================================================
+
+[+] TEST A: Valid Patient Insertion
+  [SUCCESS] Valid Patient Inserted! ID: 6ad1bed345ead9f0d7af6ee8
+
+[-] TEST B: Negative Test - Invalid Blood Group (e.g. 'Z+')
+  [PASSED REJECTION] MongoDB Engine BLOCKED the write with WriteError:
+  >> Code: 121
+  >> Message: Document failed validation against collection $jsonSchema!
+
+[-] TEST C: Negative Test - Negative Consultation Fee for Doctor
+  [PASSED REJECTION] MongoDB Engine BLOCKED doctor write with WriteError:
+  >> Code: 121
+  >> Message: Consultation fee violated minimum boundary ($minimum: 100)!
+
+[STEP 3] Running PyMongo CRUD Operations...
+
+================================================================================
+  2. PYMONGO CRUD OPERATIONS DEMONSTRATION
+================================================================================
+
+[A] READ: Find Patients with Blood Group 'B+'
++--------------+--------------+----------+---------------+-----------------------------+
+| patient_id   | name         | gender   | blood_group   | contact                     |
++==============+==============+==========+===============+=============================+
+| PAT-1001     | Arjun Sharma | Male     | B+            | {'phone': '+91-9876543210'} |
++--------------+--------------+----------+---------------+-----------------------------+
+
+[B] READ: Full-Text Search for 'Diabetes'
++--------------+----------------+-------------------------------+
+| Patient ID   | Name           | Conditions                    |
++==============+================+===============================+
+| PAT-1001     | Arjun Sharma   | Type 2 Diabetes, Hypertension |
++--------------+----------------+-------------------------------+
+| PAT-1008     | Harpreet Singh | Type 2 Diabetes, Fatty Liver  |
++--------------+----------------+-------------------------------+
+
+[C] READ: Encounters with Critical Heart Rate (>= 100 bpm) via $elemMatch
++----------------+--------------+--------------+-------------------------------+---------------+
+| Encounter ID   | Patient ID   | Department   | Primary Diagnosis             |   Recorded HR |
++================+==============+==============+===============================+===============+
+| ENC-5002       | PAT-1002     | Pulmonology  | Acute Severe Bronchial Asthma |           115 |
++----------------+--------------+--------------+-------------------------------+---------------+
+| ENC-5003       | PAT-1003     | Cardiology   | Congestive Heart Failure      |           102 |
++----------------+--------------+--------------+-------------------------------+---------------+
+
+[D] UPDATE: Appending a new vital sign observation via $push to ENC-5006
+  [SUCCESS] Vital logged. Modified count: 1
+
+[E] UPDATE: Discharging Patient & Updating Billing via Atomic $set and $inc
+  [SUCCESS] Encounter ENC-5006 discharged. Modified count: 1
+
+[F] DELETE: Cancel & Purge Appointment APT-9005
+  [SUCCESS] Deleted count: 1
+
+[STEP 4] Running MongoDB Aggregation Pipelines...
+
+================================================================================
+  3. ADVANCED MONGODB AGGREGATION PIPELINES
+================================================================================
+
+[PIPELINE 1] Departmental Financial & Operational Performance
+Stages: $match -> $group -> $sort -> $project
++--------------------+-------------------+-------------------+------------------+-----------------+-----------------------------+---------------------------+-------------------------+
+|   total_encounters |   inpatient_count |   emergency_count | department       |   total_revenue |   avg_revenue_per_encounter |   total_insurance_claimed |   patient_out_of_pocket |
++====================+===================+===================+==================+=================+=============================+===========================+=========================+
+|                  2 |                 2 |                 0 | Cardiology       |           95000 |                       47500 |                     85000 |                   10000 |
++--------------------+-------------------+-------------------+------------------+-----------------+-----------------------------+---------------------------+-------------------------+
+|                  1 |                 1 |                 0 | Oncology         |           44900 |                       44900 |                     40000 |                    4900 |
++--------------------+-------------------+-------------------+------------------+-----------------+-----------------------------+---------------------------+-------------------------+
+|                  1 |                 1 |                 0 | Orthopedics      |           40000 |                       40000 |                     38000 |                    2000 |
++--------------------+-------------------+-------------------+------------------+-----------------+-----------------------------+---------------------------+-------------------------+
+|                  2 |                 1 |                 0 | General Medicine |           33500 |                       16750 |                     25000 |                    8500 |
++--------------------+-------------------+-------------------+------------------+-----------------+-----------------------------+---------------------------+-------------------------+
+|                  1 |                 0 |                 1 | Pulmonology      |           21000 |                       21000 |                     18000 |                    3000 |
++--------------------+-------------------+-------------------+------------------+-----------------+-----------------------------+---------------------------+-------------------------+
+|                  1 |                 0 |                 0 | Neurology        |           12700 |                       12700 |                     10000 |                    2700 |
++--------------------+-------------------+-------------------+------------------+-----------------+-----------------------------+---------------------------+-------------------------+
+
+[PIPELINE 2] Doctor Workload & Revenue Analytics (Cross-Collection $lookup)
+Stages: $lookup -> $unwind -> $group -> $sort -> $project
++----------------------------+-------------+---------------------+---------------------------------+------------------+-------------------------+---------------------------+-------------------------+
+|   total_encounters_handled | doctor_id   | doctor_name         | specialization                  | department       |   unique_patients_count |   total_billing_generated |   avg_encounter_billing |
++============================+=============+=====================+=================================+==================+=========================+===========================+=========================+
+|                          2 | DOC-201     | Dr. Priya Nair      | Interventional Cardiology       | Cardiology       |                       2 |                     95000 |                   47500 |
++----------------------------+-------------+---------------------+---------------------------------+------------------+-------------------------+---------------------------+-------------------------+
+|                          1 | DOC-206     | Dr. Amitava Bose    | Medical Oncology                | Oncology         |                       1 |                     44900 |                   44900 |
++----------------------------+-------------+---------------------+---------------------------------+------------------+-------------------------+---------------------------+-------------------------+
+|                          1 | DOC-204     | Dr. Vikram Sethi    | Joint Replacement & Arthroscopy | Orthopedics      |                       1 |                     40000 |                   40000 |
++----------------------------+-------------+---------------------+---------------------------------+------------------+-------------------------+---------------------------+-------------------------+
+|                          2 | DOC-205     | Dr. Shalini Gupta   | Internal Medicine & Diabetology | General Medicine |                       2 |                     33500 |                   16750 |
++----------------------------+-------------+---------------------+---------------------------------+------------------+-------------------------+---------------------------+-------------------------+
+|                          1 | DOC-203     | Dr. Rohini Kulkarni | Pulmonology & Critical Care     | Pulmonology      |                       1 |                     21000 |                   21000 |
++----------------------------+-------------+---------------------+---------------------------------+------------------+-------------------------+---------------------------+-------------------------+
+|                          1 | DOC-202     | Dr. Siddharth Mehta | Neurovascular Surgery           | Neurology        |                       1 |                     12700 |                   12700 |
++----------------------------+-------------+---------------------+---------------------------------+------------------+-------------------------+---------------------------+-------------------------+
+
+[PIPELINE 3] Medication Prescription Frequency & Utilization ($unwind)
+Stages: $unwind -> $group -> $sort -> $limit -> $project
++----------------------+----------------------+------------+------------------+
+| Medication           |   Prescription Count |   Avg Days | Departments      |
++======================+======================+============+==================+
+| Atorvastatin         |                    2 |         30 | Cardiology       |
++----------------------+----------------------+------------+------------------+
+| Amlodipine           |                    1 |         30 | General Medicine |
++----------------------+----------------------+------------+------------------+
+| Aspirin              |                    1 |         30 | Cardiology       |
++----------------------+----------------------+------------+------------------+
+| Budecort Inhaler     |                    1 |         15 | Pulmonology      |
++----------------------+----------------------+------------+------------------+
+| Calcium + Vitamin D3 |                    1 |         60 | Orthopedics      |
++----------------------+----------------------+------------+------------------+
+
+[PIPELINE 4] Multi-Faceted Executive Hospital Dashboard ($facet)
+Stages: $facet (Parallel execution of 4 analytical sub-pipelines)
+{
+  "encounter_type_distribution": [
+    {
+      "count": 2,
+      "type": "Outpatient"
+    },
+    {
+      "count": 5,
+      "type": "Inpatient"
+    },
+    {
+      "count": 1,
+      "type": "Emergency"
+    }
+  ],
+  "status_overview": [
+    {
+      "count": 7,
+      "status": "Discharged"
+    },
+    {
+      "count": 1,
+      "status": "Admitted"
+    }
+  ],
+  "financial_overview": [
+    {
+      "gross_revenue": 247100.0,
+      "avg_bill": 30887.5,
+      "min_bill": 3200.0,
+      "max_bill": 55000.0,
+      "total_insurance_covered": 216000.0
+    }
+  ],
+  "critical_vitals_count": [
+    {
+      "alert_readings": 2
+    }
+  ]
+}
+
+[PIPELINE 5] Demographic Age-Stratified Risk & Chronic Burden ($bucket)
+Stages: $addFields ($dateDiff) -> $bucket -> $project
++----------------------------+------------------------+-----------------+---------------+--------------------------------------+
+|   total_chronic_conditions | age_bracket            |   patient_count |   average_age |   avg_chronic_conditions_per_patient |
++============================+========================+=================+===============+======================================+
+|                          0 | 18 - 29 (Young Adult)  |               1 |          25   |                                 0    |
++----------------------------+------------------------+-----------------+---------------+--------------------------------------+
+|                          6 | 30 - 49 (Adult)        |               5 |          36.4 |                                 1.2  |
++----------------------------+------------------------+-----------------+---------------+--------------------------------------+
+|                          7 | 50 - 69 (Mature Adult) |               3 |          59.7 |                                 2.33 |
++----------------------------+------------------------+-----------------+---------------+--------------------------------------+
+
+[STEP 5] Demonstrating Unified Patient EHR...
+
+================================================================================
+  4. PATIENT ELECTRONIC HEALTH RECORD (EHR) LOOKUP: PAT-1001
+================================================================================
+
+PATIENT PROFILE:
+  Name:          Arjun Sharma
+  DOB / Gender:  1985-04-12 | Male
+  Blood Group:   B+
+  Contact:       +91-9876543210 | arjun.sharma@example.com
+  Allergies:     Penicillin, Peanuts
+  Chronic Cond:  Type 2 Diabetes, Hypertension
+  Insurance:     Star Health (Policy: SH-992837)
+
+CLINICAL ENCOUNTERS (1 total):
+  - [ENC-5001] Type: Inpatient | Dept: Cardiology | Status: Discharged
+    Diagnosis: Acute Coronary Syndrome
+    Billing Total: Rs 40000.0 (Payment: Paid)
+    Prescriptions: 3 logged | Vitals logs: 2 logs
+
+================================================================================
+  ALL DEMONSTRATIONS COMPLETED SUCCESSFULLY
+================================================================================

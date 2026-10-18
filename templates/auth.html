@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediPulse Admin Access</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page" data-setup-required="{{ 'true' if setup_required else 'false' }}">
+  <main class="auth-shell">
+    <div class="auth-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12 2 12"></polyline></svg>
+      </div>
+      <div>
+        <p class="auth-eyebrow">MEDIPULSE EHR</p>
+        <h1>{{ 'Create administrator' if setup_required else 'Administrator sign in' }}</h1>
+      </div>
+    </div>
+    <p class="auth-description">
+      {{ 'Set up the first admin account to manage patient records and clinical admissions.' if setup_required else 'Sign in to manage patient records and clinical admissions.' }}
+    </p>
+    <form id="authForm" class="auth-form">
+      <label class="form-group">
+        <span class="form-label">Username</span>
+        <input class="form-input" name="username" autocomplete="username" minlength="3" maxlength="50" required>
+      </label>
+      <label class="form-group">
+        <span class="form-label">Password</span>
+        <input class="form-input" type="password" name="password" autocomplete="{{ 'new-password' if setup_required else 'current-password' }}" minlength="{{ '12' if setup_required else '1' }}" required>
+      </label>
+      {% if setup_required %}
+      <label class="form-group">
+        <span class="form-label">Confirm password</span>
+        <input class="form-input" type="password" name="password_confirm" autocomplete="new-password" minlength="12" required>
+      </label>
+      {% endif %}
+      <button class="btn btn-primary auth-submit" type="submit">{{ 'Create admin account' if setup_required else 'Sign in' }}</button>
+      <p class="validation-alert" id="authMessage" role="alert"></p>
+    </form>
+    <p class="auth-footnote">Administrator credentials are stored in MongoDB as a password hash.</p>
+  </main>
+  <script src="/static/js/auth.js"></script>
+</body>
+</html>

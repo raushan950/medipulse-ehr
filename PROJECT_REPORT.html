@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MediPulse EHR - Academic Task 2 Project Report (CSE494)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.65;
+      color: #1e293b;
+      background-color: #f8fafc;
+      margin: 0;
+      padding: 2.5rem 1rem;
+    }
+    .report-container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 3.5rem 4rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+    }
+    .header-block {
+      text-align: center;
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 2rem;
+      margin-bottom: 2.5rem;
+    }
+    .header-block h1 {
+      font-size: 1.8rem;
+      color: #0f172a;
+      margin: 0 0 0.5rem 0;
+      font-weight: 800;
+    }
+    .header-block h2 {
+      font-size: 1.25rem;
+      color: #0284c7;
+      margin: 0 0 1rem 0;
+      font-weight: 600;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      color: #475569;
+      background: #f1f5f9;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      text-align: left;
+    }
+    h2 {
+      font-size: 1.4rem;
+      color: #0f172a;
+      border-left: 4px solid #0284c7;
+      padding-left: 0.8rem;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    h3 {
+      font-size: 1.15rem;
+      color: #1e293b;
+      margin-top: 1.8rem;
+      margin-bottom: 0.6rem;
+    }
+    p, li {
+      font-size: 0.95rem;
+      color: #334155;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.88rem;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 0.75rem 1rem;
+      text-align: left;
+    }
+    th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+    pre {
+      background-color: #0f172a;
+      color: #38bdf8;
+      padding: 1.2rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .callout {
+      background-color: #f0f9ff;
+      border-left: 4px solid #0284c7;
+      padding: 1rem 1.2rem;
+      margin: 1.2rem 0;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.92rem;
+    }
+    .callout-success {
+      background-color: #f0fdf4;
+      border-left-color: #16a34a;
+      color: #15803d;
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      .report-container { box-shadow: none; border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="report-container">
+    <div class="header-block">
+      <h1>LOVELY PROFESSIONAL UNIVERSITY</h1>
+      <h2>School of Computer Science & Engineering</h2>
+      <div style="font-size: 1.3rem; font-weight: 700; color: #0f172a; margin-top: 0.5rem;">
+        MediPulse EHR: Intelligent Hospital & Electronic Health Record Management Platform
+      </div>
+      <div class="meta-grid">
+        <div><strong>Course Code:</strong> CSE494</div>
+        <div><strong>Course Title:</strong> Intelligent NoSQL Databases</div>
+        <div><strong>Academic Task:</strong> Task 2 (Project Report)</div>
+        <div><strong>Maximum Marks:</strong> 30</div>
+        <div><strong>Database Engine:</strong> MongoDB 8.2 (WiredTiger)</div>
+        <div><strong>Driver / Library:</strong> PyMongo 4.19 (Python 3.12)</div>
+      </div>
+    </div>
+
+    <h2>1. Problem Selection & Real-World Relevance</h2>
+    <p>
+      In multi-specialty healthcare environments, patient medical profiles are dynamic, semi-structured, and subject to evolving regulatory requirements. Relational Database Management Systems (RDBMS) impose rigid schema definitions that struggle with multi-disciplinary clinical visits, high-frequency vitals telemetry, and variable diagnostic test results.
+    </p>
+    <p>
+      Retrieving a complete clinical encounter in SQL requires joining 5 to 7 separate tables (<code>patients</code>, <code>encounters</code>, <code>vitals</code>, <code>prescriptions</code>, <code>lab_orders</code>, <code>billing</code>), resulting in noticeable latency and high CPU usage under concurrent workloads.
+    </p>
+    <div class="callout">
+      <strong>Core NoSQL Advantage:</strong> MongoDB's document model allows <strong>natural embedding</strong> of vitals logs and prescriptions inside individual encounter records. This delivers single I/O fetch speeds ($O(1)$) and document-level atomic writes without expensive relational table locks.
+    </div>
+
+    <h2>2. Database & Document Design</h2>
+    <p>
+      The MediPulse system organizes clinical records into four primary collections: <code>patients</code>, <code>doctors</code>, <code>encounters</code>, and <code>appointments</code>.
+    </p>
+
+    <h3>Embedding vs. Referencing Rationale</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Relationship</th>
+          <th>Design Strategy</th>
+          <th>Architectural Decision Rationale</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Encounter $\rightarrow$ Vitals & Prescriptions</strong></td>
+          <td>Embedded Arrays</td>
+          <td><strong>1:Few Cardinality & Bounded Growth:</strong> A patient visit typically has 2–20 vitals and 1–6 medications. Embedding eliminates joins, keeps documents under 4KB (well below MongoDB's 16MB limit), and ensures atomic updates.</td>
+        </tr>
+        <tr>
+          <td><strong>Patient $\rightarrow$ Encounters</strong></td>
+          <td>Referenced by <code>patient_id</code></td>
+          <td><strong>1:Many Unbounded Growth:</strong> A patient may visit the hospital hundreds of times over their lifetime. Embedding all visits in a single patient document would lead to document bloating and exceed the 16MB limit.</td>
+        </tr>
+        <tr>
+          <td><strong>Doctor $\rightarrow$ Encounters</strong></td>
+          <td>Referenced by <code>doctor_id</code></td>
+          <td><strong>Independent Entity:</strong> Doctors exist independently as hospital staff and consult thousands of patients over years.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Indexing Strategy</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Collection</th>
+          <th>Index Specification</th>
+          <th>Type</th>
+          <th>Operational Benefit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>patients</code></td>
+          <td><code>{"patient_id": 1}</code></td>
+          <td>Unique</td>
+          <td>Guarantees unique primary identification; $O(1)$ point lookups</td>
+        </tr>
+        <tr>
+          <td><code>patients</code></td>
+          <td><code>{"blood_group": 1}</code></td>
+          <td>Single Field</td>
+          <td>Rapid emergency blood donor matching</td>
+        </tr>
+        <tr>
+          <td><code>patients</code></td>
+          <td><code>{"name": "text", "medical_profile.chronic_conditions": "text"}</code></td>
+          <td>Text Index</td>
+          <td>Inverted index for full-text search across clinical records</td>
+        </tr>
+        <tr>
+          <td><code>encounters</code></td>
+          <td><code>{"department": 1, "admission_date": -1}</code></td>
+          <td>Compound</td>
+          <td>Optimizes chronological departmental admission queries</td>
+        </tr>
+        <tr>
+          <td><code>encounters</code></td>
+          <td><code>{"vitals_log.timestamp": -1}</code></td>
+          <td>Multikey</td>
+          <td>Fast temporal querying of nested telemetry readings</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. MongoDB Schema Validation ($jsonSchema)</h2>
+    <p>
+      MediPulse applies strict collection-level validation rules inside the MongoDB engine using <code>$jsonSchema</code> with <code>validationLevel: "strict"</code> and <code>validationAction: "error"</code>.
+    </p>
+    <pre>
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": ["patient_id", "name", "gender", "blood_group", "dob", "contact"],
+    "properties": {
+      "patient_id": { "bsonType": "string", "pattern": "^PAT-[0-9]{4,}$" },
+      "blood_group": { "enum": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] },
+      "contact": {
+        "bsonType": "object",
+        "required": ["phone", "email"],
+        "properties": {
+          "phone": { "bsonType": "string", "pattern": "^\\+?[0-9\\s\\-]{10,15}$" }
+        }
+      }
+    }
+  }
+}</pre>
+
+    <div class="callout callout-success">
+      <strong>Negative Validation Proof:</strong> Inserting a document with an invalid blood group (<code>"Z+"</code>) or an invalid phone number was blocked by the MongoDB engine with <code>WriteError: Document failed validation against collection $jsonSchema (Code: 121)</code>.
+    </div>
+
+    <h2>4. CRUD Operations Catalog</h2>
+    <ul>
+      <li><strong>Create:</strong> <code>insert_one</code> for patient registration; <code>insert_many</code> for bulk appointments ingestion.</li>
+      <li><strong>Read:</strong> Equality queries with projection, compound filters with <code>$and</code> and <code>$or</code>, text search with <code>$textScore</code> ranking, and nested array queries with <code>$elemMatch</code>.</li>
+      <li><strong>Update:</strong> <code>$set</code> for demographic updates, <code>$push</code> for appending new vital readings, <code>$addToSet</code> for recording unique allergies, and atomic <code>$set</code> + <code>$inc</code> for encounter discharge and billing updates.</li>
+      <li><strong>Delete:</strong> <code>delete_one</code> for appointment cancellation, <code>delete_many</code> for purging cancelled logs.</li>
+    </ul>
+
+    <h2>5. Advanced Aggregation Pipelines</h2>
+    <p>Five multi-stage aggregation pipelines were designed and evaluated:</p>
+
+    <h3>Pipeline 1: Departmental Financial & Operational Performance</h3>
+    <p><strong>Stages:</strong> <code>$match</code> $\rightarrow$ <code>$group</code> $\rightarrow$ <code>$sort</code> $\rightarrow$ <code>$project</code></p>
+    <table>
+      <thead>
+        <tr><th>Department</th><th>Encounters</th><th>Inpatient</th><th>Emergency</th><th>Total Revenue</th><th>Out-of-Pocket</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Cardiology</strong></td><td>2</td><td>2</td><td>0</td><td>₹95,000.00</td><td>₹10,000.00</td></tr>
+        <tr><td><strong>Oncology</strong></td><td>1</td><td>1</td><td>0</td><td>₹44,900.00</td><td>₹4,900.00</td></tr>
+        <tr><td><strong>Orthopedics</strong></td><td>1</td><td>1</td><td>0</td><td>₹40,000.00</td><td>₹2,000.00</td></tr>
+        <tr><td><strong>General Medicine</strong></td><td>2</td><td>1</td><td>0</td><td>₹33,500.00</td><td>₹8,500.00</td></tr>
+        <tr><td><strong>Pulmonology</strong></td><td>1</td><td>0</td><td>1</td><td>₹21,000.00</td><td>₹3,000.00</td></tr>
+        <tr><td><strong>Neurology</strong></td><td>1</td><td>0</td><td>0</td><td>₹12,700.00</td><td>₹2,700.00</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Pipeline 2: Doctor Workload & Cross-Collection Revenue Analytics</h3>
+    <p><strong>Stages:</strong> <code>$lookup</code> (join <code>encounters</code> with <code>doctors</code>) $\rightarrow$ <code>$unwind</code> $\rightarrow$ <code>$group</code> $\rightarrow$ <code>$sort</code> $\rightarrow$ <code>$project</code></p>
+    <table>
+      <thead>
+        <tr><th>Doctor Name</th><th>Specialization</th><th>Department</th><th>Encounters</th><th>Unique Pts</th><th>Revenue Generated</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Dr. Priya Nair</strong></td><td>Interventional Cardiology</td><td>Cardiology</td><td>2</td><td>2</td><td>₹95,000.00</td></tr>
+        <tr><td><strong>Dr. Amitava Bose</strong></td><td>Medical Oncology</td><td>Oncology</td><td>1</td><td>1</td><td>₹44,900.00</td></tr>
+        <tr><td><strong>Dr. Vikram Sethi</strong></td><td>Joint Replacement</td><td>Orthopedics</td><td>1</td><td>1</td><td>₹40,000.00</td></tr>
+        <tr><td><strong>Dr. Shalini Gupta</strong></td><td>Internal Medicine</td><td>General Medicine</td><td>2</td><td>2</td><td>₹33,500.00</td></tr>
+        <tr><td><strong>Dr. Rohini Kulkarni</strong></td><td>Pulmonology & Critical Care</td><td>Pulmonology</td><td>1</td><td>1</td><td>₹21,000.00</td></tr>
+        <tr><td><strong>Dr. Siddharth Mehta</strong></td><td>Neurovascular Surgery</td><td>Neurology</td><td>1</td><td>1</td><td>₹12,700.00</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Pipeline 3: Medication Prescription Frequency & Utilization</h3>
+    <p><strong>Stages:</strong> <code>$unwind</code> (flatten <code>prescriptions</code> array) $\rightarrow$ <code>$group</code> $\rightarrow$ <code>$sort</code> $\rightarrow$ <code>$limit</code> $\rightarrow$ <code>$project</code></p>
+    <p>Identified <strong>Atorvastatin</strong> (2 prescriptions, avg 30 days) and <strong>Amlodipine</strong> as the most commonly prescribed maintenance therapies.</p>
+
+    <h3>Pipeline 4: Executive Multi-Faceted Hospital Dashboard ($facet)</h3>
+    <p><strong>Stages:</strong> <code>$facet</code> executes 4 simultaneous sub-pipelines in a single database pass:
+      (1) Encounter type distribution (5 Inpatient, 2 Outpatient, 1 Emergency),
+      (2) Status distribution (7 Discharged, 1 Admitted),
+      (3) Financial summary (Gross revenue ₹2,47,100, Average bill ₹30,887.50, Insurance ₹2,16,000), and
+      (4) Critical vitals alerts (2 readings with $\text{HR} \ge 100$ or $\text{SpO}_2 \le 93\%$).
+    </p>
+
+    <h3>Pipeline 5: Demographic Risk & Age Buckets ($bucket)</h3>
+    <p><strong>Stages:</strong> <code>$addFields</code> (dynamic age calculation via <code>$dateDiff</code>) $\rightarrow$ <code>$bucket</code> $\rightarrow$ <code>$project</code></p>
+    <table>
+      <thead>
+        <tr><th>Age Cohort</th><th>Patient Count</th><th>Average Age</th><th>Total Chronic Conditions</th><th>Average Chronic Risk</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>18 - 29 (Young Adult)</strong></td><td>1</td><td>25.0 yrs</td><td>0</td><td>0.00</td></tr>
+        <tr><td><strong>30 - 49 (Adult)</strong></td><td>4</td><td>38.0 yrs</td><td>6</td><td>1.50</td></tr>
+        <tr><td><strong>50 - 69 (Mature Adult)</strong></td><td>3</td><td>59.7 yrs</td><td>7</td><td>2.33</td></tr>
+      </tbody>
+    </table>
+
+    <h2>6. Verification & Test Suite</h2>
+    <p>
+      An automated unit test suite (<code>tests/test_medipulse.py</code>) validates schema constraints, CRUD operations, and all 5 aggregation pipelines.
+    </p>
+    <div class="callout callout-success">
+      <strong>Unit Test Results:</strong> <code>Ran 14 tests in 0.570s ... OK</code> (100% pass rate).
+    </div>
+
+    <h2>7. Summary of Course Outcomes Met</h2>
+    <ul>
+      <li><strong>CO4:</strong> Designed an optimal document model balancing atomic embedding and normalized referencing.</li>
+      <li><strong>CO5:</strong> Implemented engine-level <code>$jsonSchema</code> validation and rich PyMongo CRUD queries.</li>
+      <li><strong>CO6:</strong> Formulated complex multi-stage aggregation pipelines for real-time operational intelligence.</li>
+    </ul>
+
+    <div style="text-align: center; margin-top: 3rem; color: #64748b; font-size: 0.85rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem;">
+      MediPulse EHR • Academic Task 2 • CSE494: Intelligent NoSQL Databases • Lovely Professional University
+    </div>
+  </div>
+
+</body>
+</html>
