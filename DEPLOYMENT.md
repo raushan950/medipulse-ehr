@@ -58,6 +58,13 @@ Render runs Python Flask natively with Gunicorn, background tasks, and persisten
    | `MONGODB_URI` | `mongodb+srv://medipulse_admin:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority` |
    | `DATABASE_NAME` | `medipulse_db` |
    | `FLASK_SECRET_KEY` | *(Click "Generate" or paste a random string)* |
+   | `SIGNUP_INVITE_CODE` | *(Optional: set a code to restrict registration)* |
+   | `SMTP_HOST` | *(Your email provider's SMTP host)* |
+   | `SMTP_PORT` | `587` |
+   | `SMTP_USERNAME` | *(SMTP login, if required)* |
+   | `SMTP_PASSWORD` | *(SMTP app password, if required)* |
+   | `SMTP_FROM` | *(Verified sender email address)* |
+   | `PUBLIC_BASE_URL` | `https://<your-render-service>.onrender.com` |
    | `PYTHON_VERSION` | `3.12.10` |
 6. Click **Create Web Service**.
 7. Render will build and deploy your app. Once deployed, you will get a live URL (e.g., `https://medipulse-ehr.onrender.com`).
@@ -88,8 +95,21 @@ Vercel runs the Flask application as an AWS Lambda serverless function via `@ver
    | `MONGODB_URI` | `mongodb+srv://medipulse_admin:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority` |
    | `DATABASE_NAME` | `medipulse_db` |
    | `FLASK_SECRET_KEY` | *(A long random string)* |
+   | `SIGNUP_INVITE_CODE` | *(Optional: set a code to restrict registration)* |
+   | `SMTP_HOST` | *(Your email provider's SMTP host)* |
+   | `SMTP_PORT` | `587` |
+   | `SMTP_USERNAME` | *(SMTP login, if required)* |
+   | `SMTP_PASSWORD` | *(SMTP app password, if required)* |
+   | `SMTP_FROM` | *(Verified sender email address)* |
+   | `PUBLIC_BASE_URL` | `https://<your-project>.vercel.app` |
 6. Click **Deploy**.
 7. In ~60 seconds, Vercel will complete the build and assign a live production URL (e.g., `https://medipulse-ehr.vercel.app`).
+
+Password recovery uses a single-use link that expires after 30 minutes. In local Flask debug mode, the app displays the link directly on the page for development. Deployed environments must configure the SMTP variables above with credentials and a sender approved by your email provider; `PUBLIC_BASE_URL` must be the deployed app's HTTPS origin.
+
+For Outlook or Microsoft 365, use `smtp.office365.com` on port `587` with STARTTLS. For personal Outlook.com accounts, use `smtp-mail.outlook.com` on port `587`. Set `SMTP_USERNAME` and `SMTP_FROM` to the mailbox address and `SMTP_PASSWORD` to an app password if your account supports it. Some Microsoft 365 organizations disable SMTP AUTH; an administrator must enable it or provide an approved SMTP relay.
+
+By default, anyone can create an administrator account. Set `SIGNUP_INVITE_CODE` only if you want to restrict registration; every account has full access to patient and clinical records, so use the setting appropriate for your deployment.
 
 ---
 

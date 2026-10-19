@@ -29,6 +29,91 @@ class TestMediPulseSystem(unittest.TestCase):
         from database.connection import close_connection
         close_connection()
 
+    def test_admin_registration_and_password_reset(self):
+        from app import app
+        from unittest.mock import patch
+        from urllib.parse import parse_qs, urlparse
+        import uuid
+
+        suffix = uuid.uuid4().hex
+        initial_id = "primary"
+        created_initial_account = self.db.admins.count_documents({}) == 0
+        client = app.test_client()
+        password = "Initial-Password-42!"
+        if created_initial_account:
+            setup = client.post("/api/auth/setup", json={
+                "username": f"initial-{suffix[:10]}",
+                "email": f"initial-{suffix}@example.com",
+                "password": password,
+                "password_confirm": password
+            })
+            self.assertEqual(setup.status_code, 200, setup.get_json())
+
+        username = f"staff-{suffix[:12]}"
+        email = f"staff-{suffix}@example.com"
+        with patch("app.os.getenv", return_value=None):
+            registered = client.post("/api/auth/register", json={
+                "username": username,
+                "email": email,
+                "password": password,
+                "password_confirm": password
+            })
+        self.assertEqual(registered.status_code, 200, registered.get_json())
+
+        mail_environment = {
+            "SMTP_HOST": "smtp.example.com",
+            "SMTP_FROM": "noreply@example.com",
+            "PUBLIC_BASE_URL": "https://medipulse.example.com"
+        }
+        try:
+            with patch("app.os.getenv", side_effect=lambda key, default=None: mail_environment.get(key, default)):
+                with patch("app.send_password_reset_email") as send_reset:
+                    requested = client.post("/api/auth/password-reset", json={"email": email})
+            self.assertEqual(requested.status_code, 200, requested.get_json())
+            reset_url = send_reset.call_args.args[1]
+            token = parse_qs(urlparse(reset_url).query)["token"][0]
+            new_password = "Updated-Password-73!"
+            reset = client.post("/api/auth/password-reset/complete", json={
+                "token": token,
+                "password": new_password,
+                "password_confirm": new_password
+            })
+            self.assertEqual(reset.status_code, 200, reset.get_json())
+            reused = client.post("/api/auth/password-reset/complete", json={
+                "token": token,
+                "password": password,
+                "password_confirm": password
+            })
+            self.assertEqual(reused.status_code, 400)
+            client.post("/api/auth/logout")
+            signed_in = client.post("/api/auth/login", json={"username": username, "password": new_password})
+            self.assertEqual(signed_in.status_code, 200, signed_in.get_json())
+
+            previous_debug = app.config["DEBUG"]
+            app.config["DEBUG"] = True
+            try:
+                with patch("app.os.getenv", return_value=None):
+                    local_requested = client.post("/api/auth/password-reset", json={"email": email})
+            finally:
+                app.config["DEBUG"] = previous_debug
+            self.assertEqual(local_requested.status_code, 200, local_requested.get_json())
+            self.assertIn("dev_reset_url", local_requested.get_json())
+            local_token = parse_qs(urlparse(local_requested.get_json()["dev_reset_url"]).query)["token"][0]
+            local_password = "Local-Password-81!"
+            local_reset = client.post("/api/auth/password-reset/complete", json={
+                "token": local_token,
+                "password": local_password,
+                "password_confirm": local_password
+            })
+            self.assertEqual(local_reset.status_code, 200, local_reset.get_json())
+            client.post("/api/auth/logout")
+            local_sign_in = client.post("/api/auth/login", json={"username": username, "password": local_password})
+            self.assertEqual(local_sign_in.status_code, 200, local_sign_in.get_json())
+        finally:
+            self.db.admins.delete_one({"_id": username.casefold()})
+            if created_initial_account:
+                self.db.admins.delete_one({"_id": initial_id})
+
     # ---------------------------------------------
     # 1. Schema Validation Tests
     # ---------------------------------------------

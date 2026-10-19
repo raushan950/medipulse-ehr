@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MediPulse Admin Access</title>
+  <title>MediPulse Account Access</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="auth-page" data-setup-required="{{ 'true' if setup_required else 'false' }}">
@@ -14,31 +14,121 @@
       </div>
       <div>
         <p class="auth-eyebrow">MEDIPULSE EHR</p>
-        <h1>{{ 'Create administrator' if setup_required else 'Administrator sign in' }}</h1>
+        <h1>Account access</h1>
       </div>
     </div>
-    <p class="auth-description">
-      {{ 'Set up the first admin account to manage patient records and clinical admissions.' if setup_required else 'Sign in to manage patient records and clinical admissions.' }}
-    </p>
-    <form id="authForm" class="auth-form">
-      <label class="form-group">
-        <span class="form-label">Username</span>
-        <input class="form-input" name="username" autocomplete="username" minlength="3" maxlength="50" required>
-      </label>
-      <label class="form-group">
-        <span class="form-label">Password</span>
-        <input class="form-input" type="password" name="password" autocomplete="{{ 'new-password' if setup_required else 'current-password' }}" minlength="{{ '12' if setup_required else '1' }}" required>
-      </label>
-      {% if setup_required %}
-      <label class="form-group">
-        <span class="form-label">Confirm password</span>
-        <input class="form-input" type="password" name="password_confirm" autocomplete="new-password" minlength="12" required>
-      </label>
-      {% endif %}
-      <button class="btn btn-primary auth-submit" type="submit">{{ 'Create admin account' if setup_required else 'Sign in' }}</button>
-      <p class="validation-alert" id="authMessage" role="alert"></p>
-    </form>
-    <p class="auth-footnote">Administrator credentials are stored in MongoDB as a password hash.</p>
+    <p class="auth-description">Manage patient records and clinical admissions.</p>
+
+    <section class="auth-panel" data-panel="setup" {% if not setup_required %}hidden{% endif %}>
+      <h2>Create the first administrator</h2>
+      <form class="auth-form" data-endpoint="/api/auth/setup" data-redirect="true">
+        <label class="form-group">
+          <span class="form-label">Username</span>
+          <input class="form-input" name="username" autocomplete="username" minlength="3" maxlength="50" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Email</span>
+          <input class="form-input" type="email" name="email" autocomplete="email" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Password</span>
+          <input class="form-input" type="password" name="password" autocomplete="new-password" minlength="12" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Confirm password</span>
+          <input class="form-input" type="password" name="password_confirm" autocomplete="new-password" minlength="12" required>
+        </label>
+        <button class="btn btn-primary auth-submit" type="submit">Create administrator</button>
+      </form>
+    </section>
+
+    <section class="auth-panel" data-panel="login" {% if setup_required %}hidden{% endif %}>
+      <h2>Sign in</h2>
+      <form class="auth-form" data-endpoint="/api/auth/login" data-redirect="true">
+        <label class="form-group">
+          <span class="form-label">Username</span>
+          <input class="form-input" name="username" autocomplete="username" minlength="3" maxlength="50" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Password</span>
+          <input class="form-input" type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="btn btn-primary auth-submit" type="submit">Sign in</button>
+      </form>
+      <nav class="auth-links" aria-label="Account options">
+        <button type="button" data-show-panel="register">Create an account</button>
+        <button type="button" data-show-panel="forgot">Forgot password?</button>
+      </nav>
+    </section>
+
+    <section class="auth-panel" data-panel="register" hidden>
+      <h2>Create an administrator account</h2>
+      <form class="auth-form" data-endpoint="/api/auth/register" data-redirect="true">
+        {% if invite_required %}
+        <label class="form-group">
+          <span class="form-label">Invitation code</span>
+          <input class="form-input" type="password" name="invite_code" autocomplete="off" required>
+        </label>
+        {% endif %}
+        <label class="form-group">
+          <span class="form-label">Username</span>
+          <input class="form-input" name="username" autocomplete="username" minlength="3" maxlength="50" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Email</span>
+          <input class="form-input" type="email" name="email" autocomplete="email" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Password</span>
+          <input class="form-input" type="password" name="password" autocomplete="new-password" minlength="12" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Confirm password</span>
+          <input class="form-input" type="password" name="password_confirm" autocomplete="new-password" minlength="12" required>
+        </label>
+        <button class="btn btn-primary auth-submit" type="submit">Create account</button>
+      </form>
+      <nav class="auth-links" aria-label="Account options">
+        <button type="button" data-show-panel="login">Back to sign in</button>
+      </nav>
+    </section>
+
+    <section class="auth-panel" data-panel="forgot" hidden>
+      <h2>Reset your password</h2>
+      <p class="auth-panel-copy">Enter the email address on your account and we’ll send a reset link.</p>
+      <form class="auth-form" data-endpoint="/api/auth/password-reset">
+        <label class="form-group">
+          <span class="form-label">Email</span>
+          <input class="form-input" type="email" name="email" autocomplete="email" required>
+        </label>
+        <button class="btn btn-primary auth-submit" type="submit">Send reset link</button>
+      </form>
+      <nav class="auth-links" aria-label="Account options">
+        <button type="button" data-show-panel="login">Back to sign in</button>
+      </nav>
+    </section>
+
+    <section class="auth-panel" data-panel="reset" hidden>
+      <h2>Choose a new password</h2>
+      <form class="auth-form" data-endpoint="/api/auth/password-reset/complete" data-reset-complete="true">
+        <input type="hidden" name="token" id="resetToken">
+        <label class="form-group">
+          <span class="form-label">New password</span>
+          <input class="form-input" type="password" name="password" autocomplete="new-password" minlength="12" required>
+        </label>
+        <label class="form-group">
+          <span class="form-label">Confirm new password</span>
+          <input class="form-input" type="password" name="password_confirm" autocomplete="new-password" minlength="12" required>
+        </label>
+        <button class="btn btn-primary auth-submit" type="submit">Update password</button>
+      </form>
+      <nav class="auth-links" aria-label="Account options">
+        <button type="button" data-show-panel="login">Back to sign in</button>
+      </nav>
+    </section>
+
+    <p class="validation-alert" id="authMessage" role="alert" aria-live="polite"></p>
+    <p class="auth-footnote">Each account has administrator access to this MediPulse workspace.</p>
   </main>
   <script src="/static/js/auth.js"></script>
 </body>

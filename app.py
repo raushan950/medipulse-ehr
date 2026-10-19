@@ -5,11 +5,15 @@ CSE494: Intelligent NoSQL Databases - Academic Task 2
 
 from flask import Flask, render_template, jsonify, request, session, redirect
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
+import hashlib
 import math
 import os
+import re
 import secrets
 import json
+import smtplib
 from bson import json_util
 from pymongo.errors import DuplicateKeyError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -39,7 +43,10 @@ agg_service = AggregationService()
 
 @app.before_request
 def require_admin_session():
-    public_endpoints = {"static", "auth_page", "setup_admin", "login_admin", "logout_admin"}
+    public_endpoints = {
+        "static", "auth_page", "setup_admin", "register_admin", "login_admin",
+        "request_password_reset", "reset_password", "logout_admin"
+    }
     if request.endpoint in public_endpoints or session.get("admin_username"):
         return None
     if request.path.startswith("/api/"):
@@ -56,47 +63,197 @@ def index():
 
 @app.route("/auth")
 def auth_page():
-    admin_exists = get_database().admins.find_one({"_id": "primary"}) is not None
-    return render_template("auth.html", setup_required=not admin_exists)
+    admin_exists = get_database().admins.count_documents({}) > 0
+    return render_template(
+        "auth.html",
+        setup_required=not admin_exists,
+        invite_required=bool(os.getenv("SIGNUP_INVITE_CODE"))
+    )
+
+def valid_email(email):
+    return isinstance(email, str) and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is not None
+
+def send_password_reset_email(email, reset_url):
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_sender = os.getenv("SMTP_FROM") or os.getenv("SMTP_USERNAME")
+    if not smtp_host or not smtp_sender:
+        raise RuntimeError("Outgoing email is not configured.")
+
+    message = EmailMessage()
+    message["Subject"] = "Reset your MediPulse password"
+    message["From"] = smtp_sender
+    message["To"] = email
+    message.set_content(
+        "Use the link below to reset your MediPulse password. "
+        "This link expires in 30 minutes and can only be used once.\n\n"
+        f"{reset_url}\n\nIf you did not request this, you can ignore this email."
+    )
+
+    with smtplib.SMTP(smtp_host, int(os.getenv("SMTP_PORT", "587")), timeout=10) as smtp:
+        smtp.starttls()
+        smtp_username = os.getenv("SMTP_USERNAME")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        if smtp_username and smtp_password:
+            smtp.login(smtp_username, smtp_password)
+        smtp.send_message(message)
 
 @app.route("/api/auth/setup", methods=["POST"])
 def setup_admin():
     data = request.get_json(silent=True) or {}
     username = str(data.get("username", "")).strip()
+    email = str(data.get("email", "")).strip().lower()
     password = data.get("password", "")
     if len(username) < 3 or len(username) > 50:
         return jsonify({"success": False, "error": "Username must be 3 to 50 characters."}), 400
+    if not valid_email(email):
+        return jsonify({"success": False, "error": "Enter a valid email address."}), 400
     if not isinstance(password, str) or len(password) < 12:
         return jsonify({"success": False, "error": "Password must be at least 12 characters."}), 400
     if password != data.get("password_confirm"):
         return jsonify({"success": False, "error": "Passwords do not match."}), 400
 
     try:
+        get_database().admins.create_index("email", unique=True, sparse=True)
         get_database().admins.insert_one({
             "_id": "primary",
             "username": username,
+            "email": email,
             "password_hash": generate_password_hash(password),
             "created_at": datetime.now()
         })
     except DuplicateKeyError:
-        return jsonify({"success": False, "error": "An admin account has already been created."}), 409
+        return jsonify({"success": False, "error": "An account with that username or email already exists."}), 409
 
     session.clear()
     session["admin_username"] = username
     return jsonify({"success": True, "message": "Admin account created."})
+
+@app.route("/api/auth/register", methods=["POST"])
+def register_admin():
+    data = request.get_json(silent=True) or {}
+    invite_code = os.getenv("SIGNUP_INVITE_CODE")
+    supplied_invite_code = data.get("invite_code", "")
+    if invite_code and (not isinstance(supplied_invite_code, str) or not secrets.compare_digest(supplied_invite_code, invite_code)):
+        return jsonify({"success": False, "error": "A valid invitation code is required."}), 403
+    username = str(data.get("username", "")).strip()
+    email = str(data.get("email", "")).strip().lower()
+    password = data.get("password", "")
+    if len(username) < 3 or len(username) > 50:
+        return jsonify({"success": False, "error": "Username must be 3 to 50 characters."}), 400
+    if not valid_email(email):
+        return jsonify({"success": False, "error": "Enter a valid email address."}), 400
+    if not isinstance(password, str) or len(password) < 12:
+        return jsonify({"success": False, "error": "Password must be at least 12 characters."}), 400
+    if password != data.get("password_confirm"):
+        return jsonify({"success": False, "error": "Passwords do not match."}), 400
+
+    admins = get_database().admins
+    if admins.count_documents({}) == 0:
+        return jsonify({"success": False, "error": "Create the first administrator account first."}), 409
+    if admins.find_one({"username": {"$regex": f"^{re.escape(username)}$", "$options": "i"}}):
+        return jsonify({"success": False, "error": "Username or email is already registered."}), 409
+
+    try:
+        admins.create_index("email", unique=True, sparse=True)
+        admins.insert_one({
+            "_id": username.casefold(),
+            "username": username,
+            "email": email,
+            "password_hash": generate_password_hash(password),
+            "created_at": datetime.now(timezone.utc)
+        })
+    except DuplicateKeyError:
+        return jsonify({"success": False, "error": "Username or email is already registered."}), 409
+
+    session.clear()
+    session["admin_username"] = username
+    return jsonify({"success": True, "message": "Account created."})
 
 @app.route("/api/auth/login", methods=["POST"])
 def login_admin():
     data = request.get_json(silent=True) or {}
     username = str(data.get("username", "")).strip()
     password = data.get("password", "")
-    admin = get_database().admins.find_one({"_id": "primary"})
-    if not admin or username != admin.get("username") or not isinstance(password, str) or not check_password_hash(admin["password_hash"], password):
+    admins = get_database().admins
+    admin = admins.find_one({"_id": username.casefold()})
+    if not admin:
+        legacy_admin = admins.find_one({"_id": "primary"})
+        if legacy_admin and username.casefold() == legacy_admin.get("username", "").casefold():
+            admin = legacy_admin
+    if not admin or not isinstance(password, str) or not check_password_hash(admin["password_hash"], password):
         return jsonify({"success": False, "error": "Invalid username or password."}), 401
 
     session.clear()
     session["admin_username"] = username
     return jsonify({"success": True, "message": "Signed in."})
+
+@app.route("/api/auth/password-reset", methods=["POST"])
+def request_password_reset():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email", "")).strip().lower()
+    if not valid_email(email):
+        return jsonify({"success": False, "error": "Enter a valid email address."}), 400
+    smtp_configured = bool(
+        os.getenv("SMTP_HOST")
+        and (os.getenv("SMTP_FROM") or os.getenv("SMTP_USERNAME"))
+        and os.getenv("PUBLIC_BASE_URL")
+    )
+    if not smtp_configured and not app.debug:
+        return jsonify({"success": False, "error": "Password reset email is not configured on this server."}), 503
+
+    admins = get_database().admins
+    admin = admins.find_one({"email": email})
+    if admin:
+        token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+        admins.update_one({"_id": admin["_id"]}, {"$set": {
+            "reset_token_hash": token_hash,
+            "reset_token_expires_at": expires_at
+        }})
+        base_url = (os.getenv("PUBLIC_BASE_URL") if smtp_configured else request.url_root).rstrip("/")
+        reset_url = f"{base_url}/auth?token={token}"
+        if smtp_configured:
+            try:
+                send_password_reset_email(email, reset_url)
+            except Exception:
+                admins.update_one({"_id": admin["_id"]}, {"$unset": {
+                    "reset_token_hash": "",
+                    "reset_token_expires_at": ""
+                }})
+                app.logger.exception("Could not send password reset email")
+                return jsonify({"success": False, "error": "Could not send the reset email. Please try again later."}), 503
+
+    response = {"success": True, "message": "If that email belongs to an account, a reset link has been sent."}
+    if admin and app.debug and not smtp_configured:
+        response["message"] = "Development reset link generated. It expires in 30 minutes."
+        response["dev_reset_url"] = reset_url
+    return jsonify(response)
+
+@app.route("/api/auth/password-reset/complete", methods=["POST"])
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    token = data.get("token", "")
+    password = data.get("password", "")
+    if not isinstance(token, str) or not token:
+        return jsonify({"success": False, "error": "This reset link is invalid or has expired."}), 400
+    if not isinstance(password, str) or len(password) < 12:
+        return jsonify({"success": False, "error": "Password must be at least 12 characters."}), 400
+    if password != data.get("password_confirm"):
+        return jsonify({"success": False, "error": "Passwords do not match."}), 400
+
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    reset_filter = {
+        "reset_token_hash": token_hash,
+        "reset_token_expires_at": {"$gt": datetime.now(timezone.utc)}
+    }
+    result = get_database().admins.update_one(reset_filter, {
+        "$set": {"password_hash": generate_password_hash(password)},
+        "$unset": {"reset_token_hash": "", "reset_token_expires_at": ""}
+    })
+    if result.matched_count == 0:
+        return jsonify({"success": False, "error": "This reset link is invalid or has expired."}), 400
+    return jsonify({"success": True, "message": "Password reset. You can now sign in."})
 
 @app.route("/api/auth/logout", methods=["POST"])
 def logout_admin():
